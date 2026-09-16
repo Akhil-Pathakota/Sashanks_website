@@ -65,7 +65,12 @@ const DOCTOR_ID = import.meta.env.VITE_DOCTOR_ID as string | undefined;
 export async function fetchAvailableSlots(date: string): Promise<{ slots: Slot[]; usingFallback: boolean }> {
   if (SLOTS_API_URL) {
     try {
-      const url = new URL(SLOTS_API_URL);
+      // Base of window.location.origin lets SLOTS_API_URL be either a full
+      // URL (local dev, e.g. http://localhost:4000/...) or a relative path
+      // (production on Vercel, e.g. /api/public/slots) — new URL() throws
+      // on a relative path with no base, which was silently triggering the
+      // fallback below.
+      const url = new URL(SLOTS_API_URL, window.location.origin);
       if (DOCTOR_ID) url.searchParams.set('doctorId', DOCTOR_ID);
       url.searchParams.set('date', date);
 
@@ -75,8 +80,10 @@ export async function fetchAvailableSlots(date: string): Promise<{ slots: Slot[]
 
       const slots: Slot[] = data.slots ?? [];
       return { slots, usingFallback: false };
-    } catch {
-      // Fall through to the local generator so the page keeps working.
+    } catch (err) {
+      // Fall through to the local generator so the page keeps working, but
+      // log it — a silent catch here is exactly what hid the previous bug.
+      console.warn('Falling back to generated slots — could not load real slots:', err);
     }
   }
 
