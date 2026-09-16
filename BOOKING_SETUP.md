@@ -50,6 +50,7 @@ https://project-yabvj.vercel.app → same database the reception
    ```
    VITE_BOOKING_API_URL=http://localhost:4000/api/public/appointments
    VITE_SLOTS_API_URL=http://localhost:4000/api/public/slots
+   VITE_PATIENTS_API_URL=http://localhost:4000/api/public/patients
    VITE_DOCTOR_ID=3
    ```
 3. In one terminal: `npm run start:booking-proxy` (listens on port 4000).
@@ -73,12 +74,13 @@ https://project-yabvj.vercel.app → same database the reception
    ```
    VITE_BOOKING_API_URL=/api/public/appointments
    VITE_SLOTS_API_URL=/api/public/slots
+   VITE_PATIENTS_API_URL=/api/public/patients
    VITE_DOCTOR_ID=3
    ```
 3. Push to your connected repo (or trigger a redeploy) — Vercel will build
-   the site **and** deploy `api/public/slots.js` /
-   `api/public/appointments.js` as serverless functions automatically, no
-   extra configuration needed.
+   the site **and** deploy `api/public/slots.js`,
+   `api/public/appointments.js`, and `api/public/patients.js` as serverless
+   functions automatically, no extra configuration needed.
 4. Open the live site, test a real booking, and confirm it shows up on the
    reception dashboard.
 

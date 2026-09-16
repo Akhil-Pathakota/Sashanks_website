@@ -28,7 +28,7 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-const { applyCors, isRateLimited, getSlotsForDoctorDate, createAppointment } = await import('./hospitalApi.js');
+const { applyCors, isRateLimited, getSlotsForDoctorDate, getPatientLookup, createAppointment } = await import('./hospitalApi.js');
 
 const app = express();
 app.use(express.json());
@@ -55,6 +55,11 @@ app.get('/api/public/slots', rateLimit, async (req, res) => {
     console.error('Slots proxy error:', err);
     return res.status(502).json({ message: 'Could not reach the booking system. Please try again shortly.' });
   }
+});
+
+app.get('/api/public/patients', rateLimit, async (req, res) => {
+  const result = await getPatientLookup({ mobile: req.query.mobile });
+  return res.status(result.status).json(result.body);
 });
 
 app.post('/api/public/appointments', rateLimit, async (req, res) => {

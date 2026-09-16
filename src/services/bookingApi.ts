@@ -37,7 +37,12 @@ export interface BookingPayload {
   slotEnd: string; // ISO, from Slot.rawEnd
   tokenNumber: number;
   paymentType: string;
-  amountPaid: boolean;
+}
+
+export interface PatientLookupResult {
+  found: boolean;
+  fullName?: string;
+  dateOfBirth?: string; // YYYY-MM-DD
 }
 
 export interface BookingResult {
@@ -56,6 +61,7 @@ export class BookingError extends Error {
 
 const BOOKING_API_URL = import.meta.env.VITE_BOOKING_API_URL as string | undefined;
 const SLOTS_API_URL = import.meta.env.VITE_SLOTS_API_URL as string | undefined;
+const PATIENTS_API_URL = import.meta.env.VITE_PATIENTS_API_URL as string | undefined;
 const DOCTOR_ID = import.meta.env.VITE_DOCTOR_ID as string | undefined;
 
 // ---------------------------------------------------------------------
@@ -88,6 +94,27 @@ export async function fetchAvailableSlots(date: string): Promise<{ slots: Slot[]
   }
 
   return { slots: generateFallbackSlots(date), usingFallback: true };
+}
+
+// ---------------------------------------------------------------------
+// Patient auto-fill lookup
+// ---------------------------------------------------------------------
+
+/** Looks up an existing patient by a full 10-digit mobile number, to
+ *  auto-fill their name/DOB. Returns null (rather than throwing) on any
+ *  failure or if VITE_PATIENTS_API_URL isn't configured — this is a
+ *  convenience feature, not something that should block the form. */
+export async function fetchPatientByMobile(mobile: string): Promise<PatientLookupResult | null> {
+  if (!PATIENTS_API_URL) return null;
+  try {
+    const url = new URL(PATIENTS_API_URL, window.location.origin);
+    url.searchParams.set('mobile', mobile);
+    const res = await fetch(url.toString());
+    if (!res.ok) return null;
+    return (await res.json()) as PatientLookupResult;
+  } catch {
+    return null;
+  }
 }
 
 /** Generates 20-minute slots from the clinic's published hours. All shown as

@@ -148,14 +148,45 @@ function to12Hour(hm) {
   return `${h}:${m} ${ap}`;
 }
 
+// --- Find an existing patient by mobile number (exact match on the full number) ---
+export async function searchPatientByMobile(mobile) {
+  const res = await authFetch(`/patients?mobile=${encodeURIComponent(mobile)}`);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return (data.patients || []).find((p) => p.mobile_number === mobile) || null;
+}
+
+/** Read-only lookup used by the public "auto-fill on 10-digit mobile
+ *  number" feature — does NOT create a patient, just reports what's found. */
+export async function getPatientLookup({ mobile }) {
+  const digits = String(mobile || '').replace(/\D/g, '');
+  if (digits.length !== 10) {
+    return { status: 400, body: { message: 'A valid 10-digit mobile number is required.' } };
+  }
+
+  try {
+    const patient = await searchPatientByMobile(digits);
+    if (!patient) {
+      return { status: 200, body: { found: false } };
+    }
+    return {
+      status: 200,
+      body: {
+        found: true,
+        fullName: patient.full_name,
+        dateOfBirth: patient.date_of_birth,
+      },
+    };
+  } catch (err) {
+    console.error('Patient lookup error:', err);
+    return { status: 502, body: { message: 'Could not look up patient records right now.' } };
+  }
+}
+
 // --- Find an existing patient by mobile number, or create one ---
 export async function findOrCreatePatientId({ fullName, mobile, dob }) {
-  const searchRes = await authFetch(`/patients?mobile=${encodeURIComponent(mobile)}`);
-  if (searchRes.ok) {
-    const data = await searchRes.json();
-    const exact = (data.patients || []).find((p) => p.mobile_number === mobile);
-    if (exact) return exact.id;
-  }
+  const existing = await searchPatientByMobile(mobile);
+  if (existing) return existing.id;
 
   const createRes = await authFetch('/patients', {
     method: 'POST',
@@ -207,7 +238,6 @@ export async function createAppointment(payload) {
     slotEnd,
     tokenNumber,
     paymentType,
-    amountPaid,
   } = payload || {};
 
   if (!doctorId || !patientName || !patientPhone || !slotStart || !slotEnd || !tokenNumber) {
@@ -237,7 +267,11 @@ export async function createAppointment(payload) {
         // accepts (confirmed working: "cash"). Adjust PAYMENT_TYPES in
         // BookingModal.tsx to match if others turn out to be rejected.
         payment_type: String(paymentType || 'cash').toLowerCase(),
-        amount_paid: Boolean(amountPaid),
+        // Public website bookings are always unpaid at the time of booking —
+        // payment is collected in person at the clinic. Hardcoded here
+        // (not just hidden in the UI) so it can't be spoofed by a tampered
+        // client request.
+        amount_paid: false,
         token_number: Number(tokenNumber),
       }),
     });

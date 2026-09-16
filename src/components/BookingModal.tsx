@@ -3,6 +3,7 @@ import { X, CheckCircle2, AlertCircle, Loader2, Phone } from 'lucide-react';
 import { DOCTOR_INFO } from '../data';
 import {
   fetchAvailableSlots,
+  fetchPatientByMobile,
   submitAppointment,
   BookingError,
   type Slot,
@@ -43,7 +44,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [fullName, setFullName] = useState('');
   const [dob, setDob] = useState('');
   const [paymentType, setPaymentType] = useState(PAYMENT_TYPES[0]);
-  const [amountPaid, setAmountPaid] = useState(false);
+
+  // Auto-fill: looks up existing patient once a full 10-digit mobile number is entered
+  const [patientLookupStatus, setPatientLookupStatus] = useState<'idle' | 'loading' | 'found' | 'not-found'>('idle');
 
   // Slots
   const [slots, setSlots] = useState<Slot[]>([]);
@@ -80,6 +83,35 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     };
   }, [isOpen, date]);
 
+  useEffect(() => {
+    const digits = mobile.replace(/\D/g, '');
+    if (digits.length !== 10) {
+      setPatientLookupStatus('idle');
+      return;
+    }
+
+    let cancelled = false;
+    setPatientLookupStatus('loading');
+    const timer = setTimeout(() => {
+      fetchPatientByMobile(digits).then((result) => {
+        if (cancelled) return;
+        if (result?.found) {
+          setPatientLookupStatus('found');
+          // Only fill in fields the visitor hasn't already typed something into.
+          setFullName((prev) => (prev.trim() ? prev : result.fullName || ''));
+          setDob((prev) => (prev ? prev : result.dateOfBirth || ''));
+        } else {
+          setPatientLookupStatus('not-found');
+        }
+      });
+    }, 400); // debounce so it doesn't fire on every keystroke
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [mobile]);
+
   if (!isOpen) return null;
 
   const resetAndClose = () => {
@@ -92,8 +124,8 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setFullName('');
     setDob('');
     setPaymentType(PAYMENT_TYPES[0]);
-    setAmountPaid(false);
     setSelectedSlot(null);
+    setPatientLookupStatus('idle');
     onClose();
   };
 
@@ -121,7 +153,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       slotEnd: selectedSlot.rawEnd,
       tokenNumber: selectedSlot.tokenNumber,
       paymentType,
-      amountPaid,
     };
 
     setStatus('submitting');
@@ -180,18 +211,15 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
           </div>
         ) : (
           <div className="p-6 sm:p-8">
-            <p className="text-xs font-bold text-brand-600 uppercase tracking-wider mb-1">Book with</p>
             <h2 id="booking-modal-title" className="font-serif text-2xl font-bold text-slate-900">
-              {DOCTOR_INFO.shortName}
+              Book with {DOCTOR_INFO.shortName}
             </h2>
-            <p className="text-sm text-slate-500 mb-6">{DOCTOR_INFO.clinicName}</p>
+            <p className="text-sm text-slate-500 mb-6">Pulmonology</p>
 
             <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               {/* Left: Patient & appointment fields */}
               <div className="lg:col-span-5 space-y-4">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">
-                  Patient &amp; Appointment
-                </h3>
+                <h3 className="text-base font-bold text-slate-900">Patient &amp; appointment</h3>
 
                 <div>
                   <label htmlFor="bm-date" className="block text-xs font-bold text-slate-600 mb-1.5">
@@ -210,7 +238,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
                 <div>
                   <label htmlFor="bm-mobile" className="block text-xs font-bold text-slate-600 mb-1.5">
-                    Mobile Number
+                    Mobile number
                   </label>
                   <input
                     id="bm-mobile"
@@ -221,11 +249,19 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                     placeholder="9876543210"
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-hidden focus:ring-2 focus:ring-brand-400 focus:border-transparent"
                   />
+                  {patientLookupStatus === 'loading' && (
+                    <p className="mt-1 text-[11px] text-slate-400">Checking existing records…</p>
+                  )}
+                  {patientLookupStatus === 'found' && (
+                    <p className="mt-1 text-[11px] text-emerald-600 font-semibold">
+                      Existing patient found — details filled in below.
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label htmlFor="bm-name" className="block text-xs font-bold text-slate-600 mb-1.5">
-                    Full Name
+                    Full name
                   </label>
                   <input
                     id="bm-name"
@@ -240,7 +276,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
                 <div>
                   <label htmlFor="bm-dob" className="block text-xs font-bold text-slate-600 mb-1.5">
-                    Date of Birth
+                    Date of birth
                   </label>
                   <input
                     id="bm-dob"
@@ -254,7 +290,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
 
                 <div>
                   <label htmlFor="bm-payment" className="block text-xs font-bold text-slate-600 mb-1.5">
-                    Payment Type
+                    Payment type
                   </label>
                   <select
                     id="bm-payment"
@@ -270,20 +306,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                   </select>
                 </div>
 
-                <div>
-                  <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={amountPaid}
-                      onChange={(e) => setAmountPaid(e.target.checked)}
-                      className="rounded border-slate-300 text-brand-600 focus:ring-brand-400"
-                    />
-                    Amount paid
-                  </label>
-                </div>
 
                 <div>
-                  <p className="text-xs font-bold text-slate-600 mb-1.5">Selected Slot</p>
+                  <p className="text-xs font-bold text-slate-600 mb-1.5">Selected slot</p>
                   {selectedSlot ? (
                     <div className="px-4 py-2.5 rounded-xl border border-brand-200 bg-brand-50 text-sm font-bold text-brand-700">
                       {selectedSlot.start} – {selectedSlot.end}
