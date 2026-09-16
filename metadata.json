@@ -1,0 +1,6 @@
+{
+  "name": "Sri Keerthi Dental Clinic",
+  "description": "Professional dental website for Dr. Boorgula Sri Keerthi, MDS (Osmania University). Highly qualified dental specialist offering oral lesions, TMD, implants, aligners, and laser dentistry in Hyderabad.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
