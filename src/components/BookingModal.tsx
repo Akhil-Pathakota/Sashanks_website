@@ -15,10 +15,9 @@ interface BookingModalProps {
   onClose: () => void;
 }
 
-// Confirmed working against the real API: "cash". The others are UI
-// placeholders — verify each is accepted (or find the backend's exact
-// enum) before relying on them; see BOOKING_SETUP.md.
-const PAYMENT_TYPES = ['Cash', 'Card', 'UPI', 'Insurance'];
+// Payment happens in person at the clinic — not collected on the public
+// booking form. "cash" is sent as a placeholder default; confirmed working
+// against the real backend (see BOOKING_SETUP.md for the full note).
 
 function todayISO(): string {
   const d = new Date();
@@ -43,8 +42,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
   const [mobile, setMobile] = useState('');
   const [fullName, setFullName] = useState('');
   const [dob, setDob] = useState('');
-  const [paymentType, setPaymentType] = useState(PAYMENT_TYPES[0]);
-
   // Auto-fill: looks up existing patient once a full 10-digit mobile number is entered
   const [patientLookupStatus, setPatientLookupStatus] = useState<'idle' | 'loading' | 'found' | 'not-found'>('idle');
 
@@ -123,7 +120,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
     setMobile('');
     setFullName('');
     setDob('');
-    setPaymentType(PAYMENT_TYPES[0]);
     setSelectedSlot(null);
     setPatientLookupStatus('idle');
     onClose();
@@ -152,7 +148,9 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       slotStart: selectedSlot.rawStart,
       slotEnd: selectedSlot.rawEnd,
       tokenNumber: selectedSlot.tokenNumber,
-      paymentType,
+      // Payment isn't collected on the public form — always sent as "cash"
+      // as a placeholder; the clinic settles the real method in person.
+      paymentType: 'cash',
     };
 
     setStatus('submitting');
@@ -180,7 +178,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
       onClick={resetAndClose}
     >
       <div
-        className="relative w-full max-w-5xl max-h-[92vh] overflow-y-auto bg-white rounded-3xl shadow-2xl border border-slate-100"
+        className="relative w-full max-w-5xl max-h-[92vh] overflow-y-auto bg-slate-50 rounded-3xl shadow-2xl border border-slate-200"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -192,7 +190,7 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
         </button>
 
         {status === 'success' ? (
-          <div className="flex flex-col items-center text-center py-16 px-8 gap-4">
+          <div className="m-6 sm:m-8 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center text-center py-16 px-8 gap-4">
             <div className="p-3 bg-emerald-50 rounded-full">
               <CheckCircle2 className="w-10 h-10 text-emerald-500" />
             </div>
@@ -216,9 +214,12 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
             </h2>
             <p className="text-sm text-slate-500 mb-6">Pulmonology</p>
 
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Left: Patient & appointment fields */}
-              <div className="lg:col-span-5 space-y-4">
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:items-start">
+              {/* Left: Patient & appointment fields — its own card. On mobile this
+                  comes AFTER the slots card (order-2); on desktop it's back on
+                  the left (lg:order-1) and stays pinned in place while the
+                  slots card scrolls internally (lg:sticky). */}
+              <div className="order-2 lg:order-1 lg:sticky lg:top-6 lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 space-y-4">
                 <h3 className="text-base font-bold text-slate-900">Patient &amp; appointment</h3>
 
                 <div>
@@ -289,25 +290,6 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 </div>
 
                 <div>
-                  <label htmlFor="bm-payment" className="block text-xs font-bold text-slate-600 mb-1.5">
-                    Payment type
-                  </label>
-                  <select
-                    id="bm-payment"
-                    value={paymentType}
-                    onChange={(e) => setPaymentType(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-hidden focus:ring-2 focus:ring-brand-400 focus:border-transparent bg-white"
-                  >
-                    {PAYMENT_TYPES.map((pt) => (
-                      <option key={pt} value={pt}>
-                        {pt}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-
-                <div>
                   <p className="text-xs font-bold text-slate-600 mb-1.5">Selected slot</p>
                   {selectedSlot ? (
                     <div className="px-4 py-2.5 rounded-xl border border-brand-200 bg-brand-50 text-sm font-bold text-brand-700">
@@ -352,8 +334,10 @@ export default function BookingModal({ isOpen, onClose }: BookingModalProps) {
                 </div>
               </div>
 
-              {/* Right: Slot grid */}
-              <div className="lg:col-span-7 bg-slate-50 rounded-2xl border border-slate-100 p-5 flex flex-col min-h-[420px]">
+              {/* Right: Slot grid — its own card. Appears FIRST on mobile
+                  (order-1) so visitors pick a slot before scrolling down to
+                  the form/Confirm button; back on the right on desktop. */}
+              <div className="order-1 lg:order-2 lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6 flex flex-col min-h-[420px]">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-black text-slate-800">
                     Slots for {formatDateHeading(date)}
